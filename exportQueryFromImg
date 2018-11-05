@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>주차 좌표</title>
+</head>
+
+<div class='add_div'>
+  <div class='setting_div'>
+    지도 파일명 <input type='file' id='id_setting_file_input'>
+	지도 가로 사이즈 <input id='id_setting_width_input'>
+	지도 세로 사이즈 <input id='id_setting_height_input'>
+    <button id='id_setting_btn'>설정</button>
+	
+  </div>
+
+  <input id='id_add_point_input'>
+  <button id='id_add_point_btn'>포인트 추가</button>
+
+  <input id='id_add_area_input' style='display:none;'>
+  <button id='id_add_area_btn' style='display:none;'>면 추가</button>
+ 
+  <button id='id_check_area_btn' data-reset_status='A' style='display:none;'>면 확인</button>
+  
+  <button id='id_query_btn'>쿼리 생성</button>
+  <button id='id_txt_btn'></button>
+  
+  <input type='hidden' value='' id='id_add_area_status'>
+</div>
+
+<body>
+  <div class='map_div' id='id_map_div'>
+    <canvas id='id_canvas' width='' height=''></canvas>
+  </div>
+</body>
+
+</html>
+
+<style>
+	body{
+		margin:0px;
+	}
+	.map_div{
+		margin:0px;
+		width:1920px;
+		height:1080px;
+		over-flow:auto;
+	}
+	.add_div{
+		position:fixed;
+	}
+	.setting_div{
+	}
+	.point{
+		width:50px;height:50px;border: 1px solid red;text-align:center;position:absolute;cursor:pointer;
+		-moz-user-select:-moz-none;
+		-ms-user-select:none;
+		-webkit-user-select:none;
+	}
+</style>
+
+<script>
+
+	document.querySelector('#id_setting_btn').addEventListener('click',function(e){
+		let set_file_input = document.querySelector('#id_setting_file_input').files[0].name;
+		let set_width_input = document.querySelector('#id_setting_width_input').value;
+		let set_height_input = document.querySelector('#id_setting_height_input').value;
+
+		let check_file_name = set_file_input.indexOf(".");
+		
+		if(set_file_input === ""){
+			alert("파일명을 입력하세요.");
+			return;
+		}else if(set_width_input === ""){
+			alert("맵 가로 사이즈를 입력하세요.");
+			return;
+		}else if(set_height_input === ""){
+			alert("맵 세로 사이즈를 입력하세요.");
+			return;
+		}
+
+		if(check_file_name === -1){
+			alert("파일명은 확장자까지 모두 입력해주세요.");
+			return;
+		}
+
+		set_width_input += "px";
+		set_height_input += "px";	
+
+		setAreaReset();
+		setMapWidthHeight(set_width_input,set_height_input);
+		drawMapImage(map_real_width,map_real_height,set_file_input);
+
+		document.querySelector('#id_setting_file_input').value = "";
+		document.querySelector('#id_setting_width_input').value = "";
+		document.querySelector('#id_setting_height_input').value = "";
+
+		document.querySelector('.setting_div').innerHTML = "파일명:<div id='id_file_name_view'>" + set_file_input + "</div>" +
+															 "지도 가로사이즈:<div id='id_setting_width_view'>" + set_width_input + "</div>" +
+															 "지도 세로사이즈:<div id='id_setting_height_view'>" + set_height_input + "</div>";
+
+	});
+
+</script>
+
+<script>
+	
+	let map_real_width = "2440px";
+	let map_real_height = "1400px";
+	
+	let obj_json = {};
+	let arr_json = [];
+	let arr_query = [];
+
+	let area_pos_x_1 = 0;
+	let area_pos_y_1 = 0;
+	let area_pos_x_2 = 0;
+	let area_pos_y_2 = 0;
+	let check_add_area = 1;
+	
+	let canvas = document.getElementById('id_canvas');
+	
+	function getNum(str){
+	    var res;
+	    res = str.replace(/[^0-9]/g,"");
+	    return res;
+	}
+	
+	function setMapWidthHeight(map_real_width,map_real_height){
+		
+		let div_style = document.querySelector('#id_map_div').style;
+		let canvas = document.querySelector('#id_canvas');
+		div_style.width = map_real_width;
+		div_style.height = map_real_height;
+		canvas.setAttribute("width",map_real_width);
+		canvas.setAttribute("height",map_real_height);
+
+	};
+	
+	function clearCanvas()
+	{
+	    // canvas
+	    let cnvs = document.getElementById('id_canvas');
+	    // context
+	    let ctx = canvas.getContext('2d');
+
+	    // 픽셀 정리
+	    ctx.clearRect(0, 0, cnvs.width, cnvs.height);
+	    // 컨텍스트 리셋
+	    ctx.beginPath();
+	    drawMapImage(map_real_width,map_real_height,file_name);
+	}
+
+	function setAreaReset(){
+		area_pos_x_1 = 0;
+		area_pos_y_1 = 0;
+		area_pos_x_2 = 0;
+		area_pos_y_2 = 0;
+		check_add_area = 1;
+	}
+	
+	function drawMapImage(map_real_width,map_real_height,file_name){
+		//이미지 객체 생성
+        let imgClo = new Image();
+		
+        //페이지 로드후 이미지가 로드 되었을 때 이미지 출력
+        imgClo.addEventListener('load', function(){
+            //로드된 이미지를 캔버스에 출력
+            let ctx = document.getElementById('id_canvas').getContext("2d");
+			
+            let i_map_real_width = Number(getNum(map_real_width));
+            let i_map_real_height = Number(getNum(map_real_height));
+            
+            //canvas.drawImage() 함수를 사용하여 이미지 출력
+            //drawImage ( image sx, sy, sWidth, sHeight, dx, dy, dWidth, dHeight)
+            ctx.drawImage( imgClo , 0, 0, i_map_real_width, i_map_real_height);
+      
+        },false);
+        
+        imgClo.src=file_name;
+		console.log(file_name);
+	};
+		
+	document.querySelector('#id_map_div').addEventListener('click',function(e){
+		
+		let add_area_status_check = document.querySelector('#id_add_area_status').value;
+		let add_area_value = document.querySelector('#id_add_area_input').value;
+		
+		if(add_area_status_check === "NOTDOING"){
+			return;
+		}
+		
+		let pos_x = e.clientX;
+		let pos_y = e.clientY;
+
+		if(check_add_area === 1){
+			area_pos_x_1 = pos_x;
+			area_pos_y_1 = pos_y;
+			obj_json[add_area_value] = [[area_pos_x_1,area_pos_y_1]];
+			arr_json.push(add_area_value);
+			check_add_area++;
+		}else if(check_add_area === 2){
+			
+			area_pos_x_2 = pos_x;
+			area_pos_y_2 = pos_y;
+			
+			/*
+			if(obj_json.hasOwnProperty(add_area_value)){
+				if(confirm("같은 이름의 면이 존재합니다. 덮어 씌우겠습니까?")){
+					obj_json[add_area_value].push([area_pos_x_2,area_pos_y_2]);
+					arr_json.push(add_area_value);
+				};
+			}else{
+				obj_json[add_area_value].push([area_pos_x_2,area_pos_y_2]);
+				arr_json.push(add_area_value);
+			}
+			*/
+			obj_json[add_area_value].push([area_pos_x_2,area_pos_y_2]);
+			arr_json.push(add_area_value);
+			
+			document.querySelector('#id_add_area_input').value = "";
+			setAreaReset();
+			document.querySelector('#id_add_area_status').value = "NOTDOING";
+		}
+	})
+	
+	document.querySelector('#id_add_point_btn').addEventListener('click',function(e){
+		e.stopPropagation();
+		setAddPoint();
+	});
+	document.querySelector('#id_add_point_input').addEventListener('keydown',function(e){
+		e.stopPropagation();
+		console.log(e.key);
+		if(e.keyCode == 13){
+			setAddPoint();	
+		}		
+	})
+	
+	function setAddPoint(){
+		let add_point_value = document.querySelector('#id_add_point_input').value;
+		if(add_point_value === ""){
+			alert("포인트 이름을 입력하세요.");
+			return;
+		}
+		let div = document.createElement("div");
+		//div.innerHTML = "<div class='point' " + add_point_value + "</div>";
+		div.setAttribute('class','point');
+		div.innerText = add_point_value;
+		div.style.left = (Number(getNum(map_real_width) / 2)) + "px";
+		div.style.top = (Number(getNum(map_real_height) / 2)) + "px";
+		console.log(map_real_width);
+		document.querySelector('.map_div').insertBefore(div, document.querySelector('.map_div').firstChild);
+		//document.querySelector('.map_div').appendChild(div);
+
+		div.addEventListener('mousedown',function(e){
+			e.stopPropagation();
+			console.log("DOWN");
+			
+			document.body.onmousemove = function(e){
+				div.style.left = e.pageX - 25 + "px";
+				div.style.top = e.pageY - 25 + "px";
+				console.log(div.style.left);
+				console.log(div.style.top);
+				console.log(e)
+				console.log(div);
+			}
+		});
+		
+		div.addEventListener('mouseup',function(e){
+			e.stopPropagation();
+			console.log("UP")
+			document.body.onmousemove = function(e){
+				
+			}
+		})
+	}
+	
+	document.querySelector('#id_add_area_btn').addEventListener('click',function(e){
+		disabledMouseMoveEvt();
+		e.stopPropagation();
+		setAreaReset();
+		document.querySelector('#id_add_area_status').value = "DOING";
+		let add_area_value = document.querySelector('#id_add_area_input').value;
+		if(add_area_value === ""){
+			alert("면 이름을 입력하세요.");
+			return;
+		}
+	})
+	
+	document.querySelector('#id_query_btn').addEventListener('click',function(e){
+		let points = document.querySelectorAll('.point');
+		for (var i = 0; i < points.length; i++) {
+			let tmp_arr = [];
+			tmp_arr = [points[i].innerText,points[i].offsetLeft,points[i].offsetTop]; 
+		
+			arr_query.push(tmp_arr);
+		}
+//		console.log(arr_query[0][0]);
+		writeToFile(arr_query);
+		
+	});
+	
+	function writeToFile(arr){
+		let result_str = "";
+		arr_query = [];
+		for (var i = 0; i < arr.length; i++) {
+			result_str += "INSERT INTO TB_PARK (PARK_NAME,POS_X,POS_Y) VALUES(" + arr[i][0] + "," + arr[i][1] + "," + arr[i][2] + ")\n";
+		}
+		console.log(result_str);
+		document.querySelector('#id_txt_btn').innerHTML = "<a download='query' href='data:text;charset=utf-8," + encodeURIComponent(result_str)+ "'>쿼리 텍스트 파일 다운로드</a>"
+		
+	}
+		
+	document.querySelector('#id_check_area_btn').addEventListener('click',function(e){
+		e.stopPropagation();
+		console.log(this.dataset.reset_status)
+		if(this.dataset.reset_status === "B"){
+			clearCanvas();
+			this.dataset.reset_status = "A";
+			return;
+		}
+		console.log(obj_json);
+		// strokeRect(x, y, width, height) 직사각형 윤곽선 그리기
+		// clearRect(x, y, width, height) 직사각형 지우기
+		// fillRect(x, y, width, height) 색칠된 사각형 그리기
+		
+		for(var i=0; i<arr_json.length;i++){
+			let tmp_name = arr_json[i];
+			let tmp_area = obj_json[tmp_name];
+			let ctx = document.getElementById('id_canvas').getContext("2d");
+			ctx.beginPath();
+			ctx.moveTo(tmp_area[0][0],tmp_area[0][1]);
+			ctx.lineTo(tmp_area[1][0],tmp_area[0][1]);
+			ctx.lineTo(tmp_area[1][0],tmp_area[1][1]);
+			ctx.lineTo(tmp_area[0][0],tmp_area[1][1]);
+			ctx.lineTo(tmp_area[0][0],tmp_area[0][1]);
+			ctx.stroke();			
+		}
+		
+		this.dataset.reset_status = "B";
+	})
+
+	document.onkeydown = noRefresh ;
+
+	function noRefresh(){
+		/* CTRL + N키 막음. */
+		if ((event.keyCode == 78) && (event.ctrlKey == true))
+		{
+			if (window.confirm("새로고침 하시겠습니까?")) { 
+			  window.reload();
+			}else{
+				event.keyCode = 0;
+				return false;
+			}
+			
+		}
+		/* F5 번키 막음. */
+		if(event.keyCode == 116)
+		{
+			if (window.confirm("새로고침 하시겠습니까?")) { 
+			  window.reload();
+			}else{
+				event.keyCode = 0;
+				return false;
+			}
+		}
+	}
+
+</script>
