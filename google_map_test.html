@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Simple Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map. */
+      #map {
+        height: 50%;
+        width:50%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+    </style>
+    
+    <script async defer src="https://maps.googleapis.com/maps/api/js?key=&callback=initMap&libraries=geometry"
+    async defer></script>
+        
+  </head>
+  <!-- https://maps.googleapis.com/maps/api/geocode/json?address=%EC%84%9C%EC%9A%B8%EC%8B%9C%20%EA%B4%80%EC%95%85%EA%B5%AC%20%EB%B4%89%EC%B2%9C%EB%8F%99%20904-2&language=ko&sensor=false&key=&callback=initMap -->
+  <body>
+    <div id="map"></div>
+    <div><input type="text" id="id_search_value"><button id="id_search_btn">검색</button></div>
+    <script>
+    
+    var map;
+    
+    var company_name = "에이스테크노타워 8차";
+    var company_LatLng = {lat: 37.485889, lng: 126.895667};
+    
+    function initMap(){
+    	var arr_target = [[company_name,company_LatLng]];
+        setDrawMap(arr_target);
+    }
+    
+    function setDrawMap(arr_target){
+    	map = new google.maps.Map(document.getElementById('map'), {
+    		zoom: 16,
+    		center: arr_target[0][1]
+    	});
+    	
+    	for(var i=0; i< arr_target.length; i++){
+    		var marker = new google.maps.Marker({
+        		position: arr_target[i][1],
+        		map: map,
+        		title: arr_target[i][0]
+        	});
+  
+    		var content = arr_target[i][0]; // 말풍선 안에 들어갈 내용
+            
+            // 마커를 클릭했을 때의 이벤트. 말풍선 뿅~
+            var infowindow = new google.maps.InfoWindow({ content: content});
+    		
+            infowindow.open(map,marker);
+            
+           /*
+            google.maps.event.addListener(marker, "click", function() {
+            	infowindow.open(map,marker);
+            });
+            */
+            google.maps.event.addListener(marker, "click", function() {
+            	 console.log(this);
+            	 
+            	 /*
+            	 https://maps.googleapis.com/maps/api/geocode/json?latlng=37.4857419,126.9434188&language=ko&key=
+            	 */
+            	 //위도,경도로 주소 구하는 주소
+            });
+            
+           
+			
+    	}
+    }
+    
+    function setDrawPolyLine(from_lng,to_lng,map){
+   		var flightPlanCoordinates = [
+        	from_lng,
+        	to_lng
+        ];
+    
+        var flightPath = new google.maps.Polyline({
+        	path: flightPlanCoordinates,
+        	geodesic: true,
+        	strokeColor: '#FF0000',
+        	strokeOpacity: 1.0,
+        	strokeWeight: 2
+        });
+        
+        flightPath.setMap(map);
+	}
+        
+    document.querySelector('#id_search_btn').addEventListener('click',function(e){
+    	  
+    	let search_value = document.querySelector('#id_search_value').value;
+    	 
+    	if(window.XMLHttpRequest){
+            xhr = new XMLHttpRequest();
+        }else{
+            xhr = new ActiveXObject("Microsoft.XMLHTTP");
+        }
+
+  		xhr.open("get","https://maps.googleapis.com/maps/api/geocode/json?address=" + search_value + "&language=ko&sensor=false&key=&callback=initMap");
+  		xhr.send();
+  		xhr.onload = function(e) {
+  			if (xhr.status == 200) {
+  				let jsonObj = JSON.parse(xhr.responseText);
+  				console.log(jsonObj.results[0].geometry.location);
+  				console.log(jsonObj.results[0].geometry.location.lat);
+  				console.log(jsonObj.results[0].geometry.location.lng);
+  				console.log(jsonObj.results[0]);
+  				
+  				var newLatLng = {lat: jsonObj.results[0].geometry.location.lat, lng: jsonObj.results[0].geometry.location.lng};
+  	     
+	  	        var arr_target = [[company_name,company_LatLng],[search_value,newLatLng]];
+	  	     
+	  	        setDrawMap(arr_target);
+	  	        setDrawPolyLine(company_LatLng,newLatLng,map);    
+	  	        
+	  	        var from_lat = new google.maps.LatLng(jsonObj.results[0].geometry.location.lat, jsonObj.results[0].geometry.location.lng);
+	  	        var to_lat = new google.maps.LatLng(company_LatLng.lat, company_LatLng.lng);
+	  	        
+	  	        var distance = google.maps.geometry.spherical.computeDistanceBetween (from_lat, to_lat);
+	  	        distance = distance / 1000;
+	  	        
+	  	        alert("목표까지의 직선 거리는 " + distance.toFixed(2) + " KM 입니다.");
+  			}
+  		}
+    }) 
+
+    </script>
+  </body>
+</html>
